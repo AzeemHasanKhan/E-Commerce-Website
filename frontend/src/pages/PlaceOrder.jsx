@@ -37,6 +37,35 @@ function PlaceOrder() {
     setFormData((data) => ({ ...data, [name]: value }));
   };
 
+  const initPay = (order) => {
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency,
+      name: "Order Payment",
+      description: "Order Payment",
+      order_id: order.id,
+      handler: async (response) => {
+        console.log(response);
+        try {
+          const { data } = await axios.post(
+            backendUrl + "/api/order/verifyRazorpay",
+            response,
+            { headers: { token } }
+          );
+          if (data.success) {
+            navigate("/orders");
+            setCartItems({});
+          }
+        } catch (error) {
+          toast.error(error.response.data.message);
+        }
+      },
+    };
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+
   const onSubmitHandler = async (event) => {
     event.preventDefault();
 
@@ -70,7 +99,7 @@ function PlaceOrder() {
             orderData,
             { headers: { token } }
           );
-          console.log(response.data)
+          console.log(response.data);
           if (response.data.success) {
             setCartItems({});
             navigate("/orders");
@@ -80,11 +109,39 @@ function PlaceOrder() {
 
           break;
 
+        case "stripe":
+          const responseStripe = await axios.post(
+            backendUrl + "/api/order/stripe",
+            orderData,
+            { headers: { token } }
+          );
+          if (responseStripe.data.success) {
+            const { session_url } = responseStripe.data;
+            window.location.replace(session_url);
+          } else {
+            toast.error(responseStripe.data.message);
+          }
+          break;
+
+        case "razorpay":
+          console.log("calling api");
+          const responseRazorpay = await axios.post(
+            backendUrl + "/api/order/razorpay",
+            orderData,
+            { headers: { token } }
+          );
+
+          if (responseRazorpay.data.success) {
+            initPay(responseRazorpay.data.order);
+          }
+
+          break;
+
         default:
           break;
       }
 
-      console.log(orderItems);
+      // console.log(orderItems);
     } catch (error) {
       console.error(error);
       toast.error(error.message);
